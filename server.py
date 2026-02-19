@@ -1,5 +1,5 @@
 """
-WebSocket server for The Mind multiplayer card game.
+WebSocket server for Happy Hour Games platform.
 
 Manages game lobbies, player connections, and relays game state
 to connected clients via WebSocket messages.
@@ -21,9 +21,10 @@ from the_mind import TheMind, GameState
 class GameRoom:
     """Represents a game room where players connect and play."""
 
-    def __init__(self, room_id: str, num_players: int):
+    def __init__(self, room_id: str, num_players: int, game_type: str = "the_mind"):
         self.room_id = room_id
         self.num_players = num_players
+        self.game_type = game_type
         self.players: Dict[int, ServerConnection] = {}
         self.player_names: Dict[int, str] = {}
         self.game: Optional[TheMind] = None
@@ -59,13 +60,13 @@ class GameServer:
         self.rooms: Dict[str, GameRoom] = {}
         self.connection_room: Dict[ServerConnection, str] = {}
 
-    def create_room(self, room_id: str, num_players: int) -> GameRoom:
+    def create_room(self, room_id: str, num_players: int, game_type: str = "the_mind") -> GameRoom:
         """Create a new game room."""
         if room_id in self.rooms:
             raise ValueError(f"Room '{room_id}' already exists")
         if not 2 <= num_players <= 4:
             raise ValueError("Number of players must be 2-4")
-        room = GameRoom(room_id, num_players)
+        room = GameRoom(room_id, num_players, game_type)
         self.rooms[room_id] = room
         return room
 
@@ -145,13 +146,14 @@ class GameServer:
         room_id = msg.get("room_id", "").strip()
         num_players = msg.get("num_players", 2)
         name = msg.get("name", "Player").strip()
+        game_type = msg.get("game_type", "the_mind").strip()
 
         if not room_id:
             await ws.send(json.dumps({"type": "error", "message": "Room ID is required"}))
             return
 
         try:
-            room = self.create_room(room_id, int(num_players))
+            room = self.create_room(room_id, int(num_players), game_type)
         except ValueError as e:
             await ws.send(json.dumps({"type": "error", "message": str(e)}))
             return
@@ -166,6 +168,7 @@ class GameServer:
             "player_name": name,
             "num_players": room.num_players,
             "current_players": len(room.players),
+            "game_type": room.game_type,
         }))
 
     async def _handle_join_room(self, ws: ServerConnection, msg: dict) -> None:
@@ -191,6 +194,7 @@ class GameServer:
             "player_name": name,
             "num_players": room.num_players,
             "current_players": len(room.players),
+            "game_type": room.game_type,
         }))
 
         await self.broadcast(room, {
@@ -291,6 +295,7 @@ class GameServer:
                 "num_players": room.num_players,
                 "current_players": len(room.players),
                 "in_progress": room.game is not None,
+                "game_type": room.game_type,
             })
         await ws.send(json.dumps({"type": "room_list", "rooms": room_list}))
 
@@ -375,7 +380,7 @@ async def main(host: str = "0.0.0.0", port: int | None = None) -> None:
     """Start the WebSocket server."""
     if port is None:
         port = int(os.environ.get("PORT", 8765))
-    print(f"Starting The Mind WebSocket server on ws://{host}:{port}")
+    print(f"Starting Happy Hour Games server on ws://{host}:{port}")
     print(f"Open http://localhost:{port} in your browser to play!")
 
     async with websockets.serve(

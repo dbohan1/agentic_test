@@ -21,6 +21,13 @@ class TestGameRoom(unittest.TestCase):
         self.assertEqual(room.num_players, 2)
         self.assertFalse(room.is_full)
         self.assertIsNone(room.game)
+        self.assertEqual(room.game_type, "the_mind")
+
+    def test_room_creation_with_game_type(self):
+        """Test game room initializes with custom game type."""
+        room = GameRoom("test-room", 3, game_type="ore_wood_offer_letters")
+        self.assertEqual(room.game_type, "ore_wood_offer_letters")
+        self.assertEqual(room.num_players, 3)
 
     def test_add_player(self):
         """Test adding players to a room."""
@@ -68,7 +75,13 @@ class TestGameServer(unittest.TestCase):
         room = self.server.create_room("room1", 2)
         self.assertIsNotNone(room)
         self.assertEqual(room.room_id, "room1")
+        self.assertEqual(room.game_type, "the_mind")
         self.assertIn("room1", self.server.rooms)
+
+    def test_create_room_with_game_type(self):
+        """Test creating a room with a specific game type."""
+        room = self.server.create_room("room1", 2, game_type="ore_wood_offer_letters")
+        self.assertEqual(room.game_type, "ore_wood_offer_letters")
 
     def test_create_duplicate_room(self):
         """Test creating a room with a duplicate ID raises error."""
@@ -131,6 +144,38 @@ class TestGameServerAsync(unittest.TestCase):
         self.assertEqual(response["type"], "room_joined")
         self.assertEqual(response["room_id"], "game1")
         self.assertEqual(response["player_id"], 0)
+        self.assertEqual(response["game_type"], "the_mind")
+
+    def test_handle_create_room_with_game_type(self):
+        """Test creating a room with game_type via WebSocket message."""
+        ws = self._make_ws()
+        msg = json.dumps({
+            "action": "create_room",
+            "room_id": "game1",
+            "num_players": 2,
+            "name": "Alice",
+            "game_type": "ore_wood_offer_letters"
+        })
+        self._run(self.server.handle_message(ws, msg))
+
+        response = json.loads(ws.send.call_args[0][0])
+        self.assertEqual(response["type"], "room_joined")
+        self.assertEqual(response["game_type"], "ore_wood_offer_letters")
+
+    def test_handle_list_rooms_includes_game_type(self):
+        """Test that room list includes game_type."""
+        ws = self._make_ws()
+        self.server.create_room("room1", 2, "the_mind")
+        self.server.create_room("room2", 3, "ore_wood_offer_letters")
+
+        self._run(self.server.handle_message(ws, json.dumps({"action": "list_rooms"})))
+
+        response = json.loads(ws.send.call_args[0][0])
+        self.assertEqual(response["type"], "room_list")
+        self.assertEqual(len(response["rooms"]), 2)
+        game_types = {r["room_id"]: r["game_type"] for r in response["rooms"]}
+        self.assertEqual(game_types["room1"], "the_mind")
+        self.assertEqual(game_types["room2"], "ore_wood_offer_letters")
 
     def test_handle_join_room(self):
         """Test joining a room via WebSocket message."""
