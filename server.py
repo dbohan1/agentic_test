@@ -8,7 +8,7 @@ to connected clients via WebSocket messages.
 import asyncio
 import json
 import os
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Union
 
 import websockets
 from websockets.asyncio.server import ServerConnection
@@ -16,6 +16,7 @@ from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
 from the_mind import TheMind, GameState
+from azroks_republic import AzroksRepublic, AzrokGameState
 
 
 class GameRoom:
@@ -27,7 +28,7 @@ class GameRoom:
         self.game_type = game_type
         self.players: Dict[int, ServerConnection] = {}
         self.player_names: Dict[int, str] = {}
-        self.game: Optional[TheMind] = None
+        self.game: Optional[Union[TheMind, AzroksRepublic]] = None
 
     @property
     def is_full(self) -> bool:
@@ -101,6 +102,13 @@ class GameServer:
         """Build the shared game state for broadcasting."""
         if not room.game:
             return {"type": "game_state", "state": "waiting"}
+        if room.game_type == "azroks_republic":
+            info = room.game.get_game_info()
+            return {
+                "type": "game_state",
+                **info,
+                "player_names": room.player_names,
+            }
         info = room.game.get_game_info()
         return {
             "type": "game_state",
@@ -109,13 +117,22 @@ class GameServer:
         }
 
     async def send_game_state(self, room: GameRoom) -> None:
-        """Send full game state to all players, including individual hands."""
+        """Send full game state to all players, including individual info."""
         state = self._build_game_state(room)
         for pid in room.players:
             player_state = {**state}
             if room.game:
-                player_state["your_hand"] = room.game.get_player_hand(pid)
-                player_state["your_id"] = pid
+                if room.game_type == "azroks_republic":
+                    pinfo = room.game.get_player_info(pid)
+                    player_state["your_role"] = pinfo.get("role")
+                    player_state["your_sector"] = pinfo.get("sector")
+                    player_state["your_money"] = pinfo.get("money")
+                    player_state["your_improvement_level"] = pinfo.get("improvement_level")
+                    player_state["your_salary"] = pinfo.get("salary")
+                    player_state["your_id"] = pid
+                else:
+                    player_state["your_hand"] = room.game.get_player_hand(pid)
+                    player_state["your_id"] = pid
             await self.send_to_player(room, pid, player_state)
 
     async def handle_message(self, ws: ServerConnection, data: str) -> None:
@@ -139,8 +156,103 @@ class GameServer:
             await self._handle_next_level(ws)
         elif action == "list_rooms":
             await self._handle_list_rooms(ws)
+        elif action == "invest_people":
+            await self._handle_azrok_action(ws, "invest_people", msg)
+        elif action == "invest_improvement":
+            await self._handle_azrok_action(ws, "invest_improvement", msg)
+        elif action == "use_tax":
+            await self._handle_azrok_action(ws, "use_tax", msg)
+        elif action == "buy_powder_charge":
+            await self._handle_azrok_action(ws, "buy_powder_charge", msg)
+        elif action == "buy_azroks_dagger":
+            await self._handle_azrok_action(ws, "buy_azroks_dagger", msg)
+        elif action == "end_turn":
+            await self._handle_azrok_action(ws, "end_turn", msg)
+        elif action == "resolve_round":
+            await self._handle_azrok_action(ws, "resolve_round", msg)
+        elif action in ("start_round", "next_round"):
+            await self._handle_azrok_action(ws, "start_round", msg)
         else:
             await ws.send(json.dumps({"type": "error", "message": f"Unknown action: {action}"}))
+
+    async def _get_room_and_player(
+        self, ws: ServerConnection
+    ) -> tuple:
+        """Helper to get room and player_id for a ws connection.
+
+        Returns (room, player_id, room_id) or (None, None, None) on error.
+        """
+        room_id = self.connection_room.get(ws)
+        if not room_id:
+            await ws.send(json.dumps({"type": "error", "message": "Not in a room"}))
+            return None, None, None
+        room = self.get_room(room_id)
+        if not room or not room.game:
+            await ws.send(json.dumps({"type": "error", "message": "Game not started"}))
+            return None, None, None
+        player_id = room.get_player_id(ws)
+        if player_id is None:
+            await ws.send(json.dumps({"type": "error", "message": "Player not found"}))
+            return None, None, None
+        return room, player_id, room_id
+
+    async def _handle_azrok_action(self, ws: ServerConnection, action_name: str, msg: dict) -> None:
+        """Handle an Azrok's Republic game action."""
+        room, player_id, room_id = await self._get_room_and_player(ws)
+        if room is None:
+            return
+
+        if action_name == "invest_people":
+            amount = msg.get("amount")
+            if amount is None:
+                await ws.send(json.dumps({"type": "error", "message": "Amount required"}))
+                return
+            success, message = room.game.invest_people(player_id, int(amount))
+        elif action_name == "invest_improvement":
+            success, message = room.game.invest_improvement(player_id)
+        elif action_name == "use_tax":
+            target_id = msg.get("target_id")
+            if target_id is None:
+                await ws.send(json.dumps({"type": "error", "message": "Target ID required"}))
+                return
+            success, message = room.game.use_tax(player_id, int(target_id))
+        elif action_name == "buy_powder_charge":
+            success, message = room.game.buy_powder_charge(player_id)
+        elif action_name == "buy_azroks_dagger":
+            success, message = room.game.buy_azroks_dagger(player_id)
+        elif action_name == "end_turn":
+            success, message = room.game.end_turn(player_id)
+        elif action_name == "resolve_round":
+            result = room.game.resolve_round()
+            await self.broadcast(room, {
+                "type": "action_result",
+                "action": "resolve_round",
+                "result": result,
+            })
+            await self.send_game_state(room)
+            return
+        elif action_name == "start_round":
+            result = room.game.start_round()
+            await self.broadcast(room, {
+                "type": "action_result",
+                "action": "start_round",
+                "result": result,
+            })
+            await self.send_game_state(room)
+            return
+        else:
+            await ws.send(json.dumps({"type": "error", "message": f"Unknown azrok action: {action_name}"}))
+            return
+
+        await self.broadcast(room, {
+            "type": "action_result",
+            "action": action_name,
+            "player_id": player_id,
+            "player_name": room.player_names.get(player_id, ""),
+            "success": success,
+            "message": message,
+        })
+        await self.send_game_state(room)
 
     async def _handle_create_room(self, ws: ServerConnection, msg: dict) -> None:
         room_id = msg.get("room_id", "").strip()
@@ -207,8 +319,14 @@ class GameServer:
 
         # Auto-start game when room is full
         if room.is_full:
-            room.game = TheMind(room.num_players)
-            room.game.setup_level()
+            if room.game_type == "azroks_republic":
+                game = AzroksRepublic(room.num_players)
+                game.setup_game()
+                game.start_round()
+                room.game = game
+            else:
+                room.game = TheMind(room.num_players)
+                room.game.setup_level()
             await self.broadcast(room, {"type": "game_started"})
             await self.send_game_state(room)
 
