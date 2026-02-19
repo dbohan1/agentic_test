@@ -107,20 +107,6 @@ class GameServer:
         """Build the shared game state for broadcasting."""
         if not room.game:
             return {"type": "game_state", "state": "waiting"}
-        if room.game_type == "azroks_republic":
-            info = room.game.get_game_info()
-            return {
-                "type": "game_state",
-                **info,
-                "player_names": room.player_names,
-            }
-        if room.game_type == "team_supreme_scribbles":
-            info = room.game.get_game_info()
-            return {
-                "type": "game_state",
-                **info,
-                "player_names": room.player_names,
-            }
         info = room.game.get_game_info()
         return {
             "type": "game_state",
