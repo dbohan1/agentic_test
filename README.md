@@ -190,6 +190,34 @@ Player 1 plays 10: Card 10 played successfully!
 Player 0 plays 50: Card 50 played successfully! Level 1 complete!
 ```
 
+## Deploying to Render.com
+
+You can deploy The Mind to [Render](https://render.com) so anyone can play over the internet.
+
+### Option A — One-Click Deploy with Blueprint
+
+1. Push this repository to your own GitHub account (or fork it).
+2. Log in to [Render Dashboard](https://dashboard.render.com/).
+3. Click **New → Blueprint** and connect the GitHub repository.
+4. Render will detect the `render.yaml` file and configure the service automatically.
+5. Click **Apply** to create the service. Render will install dependencies and start the server.
+6. Once the deploy finishes, open the URL shown in the Render dashboard (e.g. `https://the-mind-xxxx.onrender.com`) to play.
+
+### Option B — Manual Web Service Setup
+
+1. Push this repository to your own GitHub account (or fork it).
+2. Log in to [Render Dashboard](https://dashboard.render.com/).
+3. Click **New → Web Service** and connect the GitHub repository.
+4. Configure the service with these settings:
+   - **Runtime**: Python
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `python server.py`
+5. Optionally set the **PYTHON_VERSION** environment variable to `3.11` (or any 3.10+).
+6. Click **Deploy Web Service**.
+7. Once the deploy finishes, open the URL shown in the Render dashboard to play.
+
+> **Note:** Render automatically provides a `PORT` environment variable. The server reads it at startup, so no extra configuration is needed.
+
 ## Contributing
 
 This is a test repository for agentic tasks. Feel free to experiment and extend the implementation!
