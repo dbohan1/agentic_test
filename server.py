@@ -181,6 +181,10 @@ class GameServer:
             await self._handle_scribbles_action(ws, "guess", msg)
         elif action == "scribbles_end_drawing":
             await self._handle_scribbles_action(ws, "end_drawing", msg)
+        elif action == "scribbles_draw":
+            await self._handle_scribbles_draw(ws, msg)
+        elif action == "scribbles_clear":
+            await self._handle_scribbles_clear(ws)
         else:
             await ws.send(json.dumps({"type": "error", "message": f"Unknown action: {action}"}))
 
@@ -306,6 +310,46 @@ class GameServer:
             return
 
         await ws.send(json.dumps({"type": "error", "message": f"Unknown scribbles action: {action_name}"}))
+
+    async def _handle_scribbles_draw(self, ws: ServerConnection, msg: dict) -> None:
+        """Relay drawing data from the drawer to all other players."""
+        room, player_id, room_id = await self._get_room_and_player(ws)
+        if room is None:
+            return
+
+        # Only the current drawer can send draw data
+        if player_id != room.game.current_drawer:
+            return
+
+        # Relay stroke data to all other players
+        stroke = msg.get("stroke")
+        if stroke is None:
+            return
+
+        data = json.dumps({"type": "scribbles_draw", "stroke": stroke})
+        for pid, conn in room.players.items():
+            if pid != player_id:
+                try:
+                    await conn.send(data)
+                except websockets.exceptions.ConnectionClosed:
+                    pass
+
+    async def _handle_scribbles_clear(self, ws: ServerConnection) -> None:
+        """Relay canvas clear from the drawer to all other players."""
+        room, player_id, room_id = await self._get_room_and_player(ws)
+        if room is None:
+            return
+
+        if player_id != room.game.current_drawer:
+            return
+
+        data = json.dumps({"type": "scribbles_clear"})
+        for pid, conn in room.players.items():
+            if pid != player_id:
+                try:
+                    await conn.send(data)
+                except websockets.exceptions.ConnectionClosed:
+                    pass
 
     async def _handle_create_room(self, ws: ServerConnection, msg: dict) -> None:
         room_id = msg.get("room_id", "").strip()
