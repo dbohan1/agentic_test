@@ -33,19 +33,47 @@ Complete all twelve levels of the game without losing all your life cards.
 
 ## Installation
 
-No installation required! Just Python 3.6+.
+No installation required for the base game — just Python 3.6+.
+
+For the **multiplayer web application**, install the dependencies:
 
 ```bash
 # Clone the repository
 git clone https://github.com/dbohan1/agentic_test.git
 cd agentic_test
 
-# Run the example
+# Install dependencies (needed for web app)
+pip install -r requirements.txt
+
+# Run the example (no dependencies needed)
 python3 example_gameplay.py
 
 # Run tests
 python3 test_the_mind.py
+python3 test_server.py
 ```
+
+## Web Application (Multiplayer)
+
+Play The Mind with friends over a shared WebSocket server!
+
+### Quick Start
+
+```bash
+pip install -r requirements.txt
+python3 server.py
+```
+
+Then open **http://localhost:8765** in your browser. Each player opens the URL in their own browser tab or device on the same network.
+
+### How to Play Online
+
+1. **Create a room** — Enter your name, a room name, and choose the number of players, then click **Create Room**.
+2. **Share the room** — Other players open the same URL, enter their name, and click **Join** on the room from the list (or use **Refresh Rooms** to see available rooms).
+3. **Game starts automatically** — Once all players have joined, cards are dealt and the game begins.
+4. **Play cards** — Click a card in your hand to play it. Cards must be played in ascending order across all players.
+5. **Use throwing stars** — Click the ⭐ button to have every player discard their lowest card.
+6. **Complete levels** — After finishing a level, any player can click **Next Level** to advance.
 
 ## Usage
 
@@ -109,14 +137,22 @@ Get current game information.
 ## Files
 
 - `the_mind.py` - Main game implementation
-- `test_the_mind.py` - Unit tests
+- `server.py` - WebSocket server for multiplayer web app
+- `static/index.html` - Web frontend (HTML/CSS/JS)
+- `requirements.txt` - Python dependencies
+- `test_the_mind.py` - Unit tests for game logic
+- `test_server.py` - Unit tests for WebSocket server
 - `example_gameplay.py` - Interactive gameplay example
 - `README.md` - This file
 
 ## Running Tests
 
 ```bash
+# Game logic tests
 python3 test_the_mind.py -v
+
+# Server tests
+python3 test_server.py -v
 ```
 
 All tests should pass:
