@@ -313,5 +313,185 @@ class TestGameServerAsync(unittest.TestCase):
         self.assertIn("full", response["message"])
 
 
+class TestAzrokServerAsync(unittest.TestCase):
+    """Async test cases for Azrok's Republic WebSocket handling."""
+
+    def setUp(self):
+        self.server = GameServer()
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+    def tearDown(self):
+        self.loop.close()
+
+    def _run(self, coro):
+        return self.loop.run_until_complete(coro)
+
+    def _make_ws(self):
+        ws = AsyncMock()
+        ws.send = AsyncMock()
+        return ws
+
+    def _create_full_azrok_room(self):
+        """Create a room with 4 players and auto-start the game."""
+        players = [self._make_ws() for _ in range(4)]
+        self._run(self.server.handle_message(players[0], json.dumps({
+            "action": "create_room", "room_id": "azrok1", "num_players": 4,
+            "name": "Alice", "game_type": "azroks_republic"
+        })))
+        for i, name in enumerate(["Bob", "Charlie", "Diana"], start=1):
+            self._run(self.server.handle_message(players[i], json.dumps({
+                "action": "join_room", "room_id": "azrok1", "name": name
+            })))
+        return players
+
+    def test_create_azrok_room(self):
+        """Test creating an Azrok's Republic room via WebSocket."""
+        ws = self._make_ws()
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "create_room", "room_id": "azrok1", "num_players": 4,
+            "name": "Alice", "game_type": "azroks_republic"
+        })))
+        response = json.loads(ws.send.call_args[0][0])
+        self.assertEqual(response["type"], "room_joined")
+        self.assertEqual(response["game_type"], "azroks_republic")
+
+    def test_azrok_game_starts_with_4_players(self):
+        """Test that Azrok's Republic game starts when 4 players join."""
+        players = self._create_full_azrok_room()
+        room = self.server.get_room("azrok1")
+        self.assertIsNotNone(room.game)
+        self.assertEqual(room.game_type, "azroks_republic")
+
+    def test_azrok_game_state_includes_role(self):
+        """Test that game state includes player role info."""
+        players = self._create_full_azrok_room()
+        # Find a game_state message sent to player 0
+        for call in players[0].send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "game_state" and "your_role" in msg:
+                self.assertIn(msg["your_role"], [
+                    "Brother of the Republic", "Agent of the Drow"
+                ])
+                self.assertIn("your_sector", msg)
+                self.assertIn("your_money", msg)
+                self.assertIn("your_id", msg)
+                return
+        self.fail("No game_state with role info found")
+
+    def test_azrok_invest_people(self):
+        """Test investing in people via WebSocket."""
+        players = self._create_full_azrok_room()
+        room = self.server.get_room("azrok1")
+        current = room.game.get_current_player()
+        ws = players[current]
+        ws.send.reset_mock()
+
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "invest_people", "amount": 1
+        })))
+        # Should receive action_result + game_state
+        found_result = False
+        for call in ws.send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "action_result" and msg.get("action") == "invest_people":
+                self.assertTrue(msg["success"])
+                found_result = True
+        self.assertTrue(found_result)
+
+    def test_azrok_end_turn(self):
+        """Test ending a turn via WebSocket."""
+        players = self._create_full_azrok_room()
+        room = self.server.get_room("azrok1")
+        current = room.game.get_current_player()
+        ws = players[current]
+        ws.send.reset_mock()
+
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "end_turn"
+        })))
+        found_result = False
+        for call in ws.send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "action_result" and msg.get("action") == "end_turn":
+                self.assertTrue(msg["success"])
+                found_result = True
+        self.assertTrue(found_result)
+
+    def test_azrok_resolve_and_next_round(self):
+        """Test resolving a round and starting next round via WebSocket."""
+        players = self._create_full_azrok_room()
+        room = self.server.get_room("azrok1")
+
+        # End all 4 turns to reach resolution
+        for _ in range(4):
+            current = room.game.get_current_player()
+            self._run(self.server.handle_message(players[current], json.dumps({
+                "action": "end_turn"
+            })))
+
+        from azroks_republic import AzrokGameState
+        self.assertEqual(room.game.state, AzrokGameState.RESOLUTION_PHASE)
+
+        # Resolve round
+        ws = players[0]
+        ws.send.reset_mock()
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "resolve_round"
+        })))
+        found = False
+        for call in ws.send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "action_result" and msg.get("action") == "resolve_round":
+                self.assertTrue(msg["result"]["success"])
+                found = True
+        self.assertTrue(found)
+
+        self.assertEqual(room.game.state, AzrokGameState.ROUND_END)
+
+        # Start next round
+        ws.send.reset_mock()
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "start_round"
+        })))
+        found = False
+        for call in ws.send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "action_result" and msg.get("action") == "start_round":
+                self.assertTrue(msg["result"]["success"])
+                found = True
+        self.assertTrue(found)
+
+    def test_azrok_invest_people_missing_amount(self):
+        """Test invest_people without amount returns error."""
+        players = self._create_full_azrok_room()
+        room = self.server.get_room("azrok1")
+        current = room.game.get_current_player()
+        ws = players[current]
+        ws.send.reset_mock()
+
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "invest_people"
+        })))
+        response = json.loads(ws.send.call_args[0][0])
+        self.assertEqual(response["type"], "error")
+        self.assertIn("Amount", response["message"])
+
+    def test_azrok_use_tax_missing_target(self):
+        """Test use_tax without target_id returns error."""
+        players = self._create_full_azrok_room()
+        room = self.server.get_room("azrok1")
+        current = room.game.get_current_player()
+        ws = players[current]
+        ws.send.reset_mock()
+
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "use_tax"
+        })))
+        response = json.loads(ws.send.call_args[0][0])
+        self.assertEqual(response["type"], "error")
+        self.assertIn("Target", response["message"])
+
+
 if __name__ == "__main__":
     unittest.main()

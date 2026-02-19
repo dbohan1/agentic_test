@@ -14,7 +14,7 @@ A cooperative card game for 2–4 players. Everyone receives cards numbered 1–
 A politburo investment and deception game for exactly 4 players. Each player is a labor delegate representing a sector (Teachers, Builders, Miners, or Military). Some delegates are loyal Brothers of the Republic; others are secret Agents of the Drow. Invest wisely, bluff convincingly, and survive 10 rounds.
 
 - **Players**: 4
-- **Status**: 🔧 Game logic implemented (web UI coming soon)
+- **Status**: ✅ Playable now (game logic + web UI)
 
 ### 🪵 Ore, Wood & Offer Letters
 A resource trading and negotiation game.
