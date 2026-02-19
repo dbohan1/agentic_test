@@ -6,8 +6,21 @@ communicating verbally or through gestures.
 """
 
 import random
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, TypedDict
 from enum import Enum
+
+
+class GameInfo(TypedDict):
+    """Type definition for game information dictionary."""
+    num_players: int
+    current_level: int
+    lives: int
+    max_lives: int
+    throwing_stars: int
+    max_throwing_stars: int
+    state: str
+    played_pile: List[int]
+    cards_in_play: int
 
 
 class GameState(Enum):
@@ -30,11 +43,12 @@ class TheMind:
     CARD_MIN = 1
     CARD_MAX = 100
     
-    # Player count configuration: (lives, throwing_stars)
+    # Player count configuration
+    # Dictionary maps player_count -> (lives, throwing_stars)
     PLAYER_CONFIG = {
-        2: (2, 1),
-        3: (3, 1),
-        4: (4, 1),
+        2: (2, 1),  # 2 players: 2 lives, 1 throwing star
+        3: (3, 1),  # 3 players: 3 lives, 1 throwing star
+        4: (4, 1),  # 4 players: 4 lives, 1 throwing star
     }
     
     def __init__(self, num_players: int):
@@ -108,7 +122,8 @@ class TheMind:
             return False, f"Player {player_id} does not have card {card}"
         
         # Check if card can be played in order
-        if self.played_pile and card < self.played_pile[-1]:
+        last_played_card = self.played_pile[-1] if self.played_pile else 0
+        if card < last_played_card:
             # Card is out of order - lose a life and discard cards
             self._handle_out_of_order(card)
             return False, f"Card {card} played out of order! Lost a life."
@@ -189,7 +204,7 @@ class TheMind:
         else:
             self.current_level += 1
     
-    def get_game_info(self) -> Dict:
+    def get_game_info(self) -> GameInfo:
         """
         Get current game information.
         
