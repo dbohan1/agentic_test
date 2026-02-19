@@ -737,12 +737,10 @@
             const numPlayersSelect = document.getElementById('numPlayers');
             numPlayersSelect.innerHTML = '';
             if (gameType === 'azroks_republic') {
-                for (var n = 4; n <= 4; n++) {
-                    var opt = document.createElement('option');
-                    opt.value = n;
-                    opt.textContent = n + ' Players';
-                    numPlayersSelect.appendChild(opt);
-                }
+                var opt = document.createElement('option');
+                opt.value = 4;
+                opt.textContent = '4 Players';
+                numPlayersSelect.appendChild(opt);
                 numPlayersSelect.disabled = true;
             } else if (gameType === 'team_supreme_scribbles') {
                 for (var n = 1; n <= 20; n++) {
