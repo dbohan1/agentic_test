@@ -371,8 +371,10 @@ def serve_static(connection: ServerConnection, request: Request) -> Response | N
     return None
 
 
-async def main(host: str = "0.0.0.0", port: int = 8765) -> None:
+async def main(host: str = "0.0.0.0", port: int | None = None) -> None:
     """Start the WebSocket server."""
+    if port is None:
+        port = int(os.environ.get("PORT", 8765))
     print(f"Starting The Mind WebSocket server on ws://{host}:{port}")
     print(f"Open http://localhost:{port} in your browser to play!")
 
