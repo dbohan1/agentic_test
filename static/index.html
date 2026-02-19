@@ -123,6 +123,10 @@
             color: #999;
             cursor: pointer;
             font-size: 0.95em;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
         }
         .back-link:hover { color: #e94560; }
 
@@ -288,13 +292,13 @@
     <div id="hub" class="screen active">
         <h2>Choose a Game</h2>
         <div class="game-grid">
-            <div class="game-card" onclick="selectGame('the_mind')">
+            <div class="game-card" role="button" tabindex="0" onclick="selectGame('the_mind')" onkeydown="if(event.key==='Enter')selectGame('the_mind')">
                 <div class="game-icon">🧠</div>
                 <div class="game-title">The Mind</div>
                 <div class="game-desc">Play cards 1–100 in ascending order — without talking! A cooperative test of intuition.</div>
                 <span class="game-badge badge-ready">Ready to Play</span>
             </div>
-            <div class="game-card disabled" onclick="selectGame('ore_wood_offer_letters')">
+            <div class="game-card disabled" role="button" aria-disabled="true" tabindex="-1">
                 <div class="game-icon">🪵</div>
                 <div class="game-title">Ore, Wood &amp; Offer Letters</div>
                 <div class="game-desc">A resource trading and negotiation game. Trade your way to victory!</div>
@@ -305,7 +309,7 @@
 
     <!-- Lobby Screen -->
     <div id="lobby" class="screen">
-        <span class="back-link" onclick="backToHub()">← Back to Games</span>
+        <button class="back-link" onclick="backToHub()">← Back to Games</button>
         <h2 id="lobbyTitle">Enter the Lobby</h2>
         <input type="text" id="playerName" placeholder="Your name" maxlength="20">
         <input type="text" id="roomId" placeholder="Room name" maxlength="20">
@@ -321,7 +325,7 @@
 
     <!-- Placeholder Screen (for coming-soon games) -->
     <div id="placeholder" class="screen">
-        <span class="back-link" onclick="backToHub()">← Back to Games</span>
+        <button class="back-link" onclick="backToHub()">← Back to Games</button>
         <div class="placeholder-content">
             <div class="placeholder-icon">🪵</div>
             <h2>Ore, Wood &amp; Offer Letters</h2>
