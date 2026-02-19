@@ -283,6 +283,102 @@
             font-weight: bold;
             cursor: pointer;
         }
+        /* Azrok's Republic */
+        #azrokGame { text-align: center; }
+
+        .role-info {
+            margin: 10px auto;
+            padding: 12px 20px;
+            background: rgba(233, 69, 96, 0.15);
+            border: 2px solid rgba(233, 69, 96, 0.3);
+            border-radius: 10px;
+            max-width: 400px;
+        }
+        .role-info .role-label { font-size: 0.85em; color: #999; }
+        .role-info .role-value { font-size: 1.1em; font-weight: bold; color: #e94560; }
+        .role-info .sector-value { font-size: 1em; color: #f5a623; }
+
+        .turn-info {
+            margin: 12px auto;
+            padding: 10px;
+            font-size: 1.1em;
+            max-width: 500px;
+        }
+        .turn-info.your-turn {
+            background: rgba(46, 204, 113, 0.15);
+            border: 2px solid rgba(46, 204, 113, 0.4);
+            border-radius: 10px;
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .player-table {
+            margin: 16px auto;
+            border-collapse: collapse;
+            max-width: 600px;
+            width: 100%;
+        }
+        .player-table th, .player-table td {
+            padding: 8px 12px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .player-table th { color: #999; font-size: 0.85em; text-transform: uppercase; }
+        .player-table tr.active-player { background: rgba(233, 69, 96, 0.15); }
+        .player-table tr.is-you { font-weight: bold; }
+
+        .actions-panel {
+            margin: 16px auto;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            max-width: 500px;
+        }
+        .actions-panel h3 { color: #e94560; margin-bottom: 12px; }
+        .action-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 8px 0;
+            flex-wrap: wrap;
+        }
+        .action-btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .action-btn.invest { background: #0f3460; color: #fff; }
+        .action-btn.improve { background: #533483; color: #fff; }
+        .action-btn.tax { background: #f5a623; color: #1a1a2e; }
+        .action-btn.powder { background: #c0392b; color: #fff; }
+        .action-btn.dagger { background: #2ecc71; color: #fff; }
+        .action-btn.end-turn { background: #7f8c8d; color: #fff; }
+        .action-btn.resolve { background: #e94560; color: #fff; font-size: 1.1em; padding: 12px 28px; }
+        .action-btn.next-round { background: #2ecc71; color: #fff; font-size: 1.1em; padding: 12px 28px; }
+
+        .action-input {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            width: 80px;
+            font-size: 0.95em;
+        }
+        .action-select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 0.95em;
+        }
     </style>
 </head>
 <body>
@@ -296,6 +392,12 @@
                 <div class="game-icon">🧠</div>
                 <div class="game-title">The Mind</div>
                 <div class="game-desc">Play cards 1–100 in ascending order — without talking! A cooperative test of intuition.</div>
+                <span class="game-badge badge-ready">Ready to Play</span>
+            </div>
+            <div class="game-card" role="button" tabindex="0" onclick="selectGame('azroks_republic')" onkeydown="if(event.key==='Enter')selectGame('azroks_republic')">
+                <div class="game-icon">🏰</div>
+                <div class="game-title">Azrok's Republic</div>
+                <div class="game-desc">A politburo investment &amp; deception game for 4 players. Hidden roles, war funding, and intrigue!</div>
                 <span class="game-badge badge-ready">Ready to Play</span>
             </div>
             <div class="game-card disabled" role="button" aria-disabled="true" tabindex="-1">
@@ -364,6 +466,61 @@
         <button class="next-btn" id="nextBtn" onclick="nextLevel()" style="display:none;">Next Level ➡️</button>
     </div>
 
+    <!-- Azrok's Republic Game Screen -->
+    <div id="azrokGame" class="screen">
+        <div class="info-bar">
+            <div class="info-item"><div class="label">Round</div><span id="azrokRound">0/10</span></div>
+            <div class="info-item"><div class="label">War Failures</div><span id="azrokWarFails">⚔️ 0/3</span></div>
+            <div class="info-item"><div class="label">People Pot</div><span id="azrokPot">$0</span></div>
+            <div class="info-item"><div class="label">Your Money</div><span id="azrokMoney">$0</span></div>
+            <div class="info-item"><div class="label">War Cost</div><span id="azrokWarCost">$0</span></div>
+        </div>
+
+        <div id="azrokRoleInfo" class="role-info">
+            <div class="role-label">Your Role</div>
+            <div class="role-value">—</div>
+            <div class="sector-value">Sector: —</div>
+        </div>
+
+        <div id="azrokTurnInfo" class="turn-info"></div>
+
+        <div id="azrokPlayerTable"></div>
+
+        <div id="azrokActions" class="actions-panel" style="display:none;">
+            <h3>Your Actions</h3>
+            <div class="action-row">
+                <input type="number" id="investAmount" class="action-input" placeholder="$" min="1">
+                <button class="action-btn invest" onclick="investPeople()">Invest in People</button>
+            </div>
+            <div class="action-row">
+                <button class="action-btn improve" onclick="investImprovement()">Improve Labor Tools ($7)</button>
+            </div>
+            <div class="action-row">
+                <select id="taxTarget" class="action-select">
+                    <option value="">Select player...</option>
+                </select>
+                <button class="action-btn tax" onclick="useTax()">Tax a Player ($1)</button>
+            </div>
+            <div class="action-row">
+                <button class="action-btn powder" onclick="buyPowderCharge()">Buy Powder Charge ($12)</button>
+            </div>
+            <div class="action-row">
+                <button class="action-btn dagger" onclick="buyAzroksDagger()">Buy Azrok's Dagger ($14)</button>
+            </div>
+            <div class="action-row">
+                <button class="action-btn end-turn" onclick="endTurn()">End Turn</button>
+            </div>
+        </div>
+
+        <div id="azrokResolution" style="display:none;margin:16px auto;text-align:center;">
+            <button class="action-btn resolve" onclick="resolveRound()">Resolve Round</button>
+        </div>
+
+        <div id="azrokNextRound" style="display:none;margin:16px auto;text-align:center;">
+            <button class="action-btn next-round" onclick="startNextRound()">Start Next Round</button>
+        </div>
+    </div>
+
     <!-- Game Over Overlay -->
     <div id="gameOverOverlay" class="overlay">
         <div class="overlay-content">
@@ -381,6 +538,7 @@
         let myPlayerId = null;
         let myRoomId = null;
         let selectedGameType = null;
+        const AZROK_STATES = ['investment_phase', 'resolution_phase', 'round_end', 'game_won_republic', 'game_won_drow', 'setup'];
 
         function getWsUrl() {
             const loc = window.location;
@@ -431,8 +589,17 @@
                 return;
             }
             selectedGameType = gameType;
-            const titles = { 'the_mind': '🧠 The Mind — Lobby' };
+            const titles = { 'the_mind': '🧠 The Mind — Lobby', 'azroks_republic': '🏰 Azrok\'s Republic — Lobby' };
             document.getElementById('lobbyTitle').textContent = titles[gameType] || 'Lobby';
+
+            const numPlayersSelect = document.getElementById('numPlayers');
+            if (gameType === 'azroks_republic') {
+                numPlayersSelect.value = '4';
+                numPlayersSelect.disabled = true;
+            } else {
+                numPlayersSelect.disabled = false;
+            }
+
             showScreen('lobby');
             refreshRooms();
         }
@@ -444,6 +611,7 @@
             myPlayerId = null;
             myRoomId = null;
             selectedGameType = null;
+            document.getElementById('numPlayers').disabled = false;
             showScreen('hub');
         }
 
@@ -498,12 +666,20 @@
                     break;
 
                 case 'game_started':
-                    showScreen('game');
+                    if (selectedGameType === 'azroks_republic') {
+                        showScreen('azrokGame');
+                    } else {
+                        showScreen('game');
+                    }
                     addLog('Game started!', 'success');
                     break;
 
                 case 'game_state':
-                    updateGameUI(msg);
+                    if (msg.state && AZROK_STATES.includes(msg.state)) {
+                        updateAzrokUI(msg);
+                    } else {
+                        updateGameUI(msg);
+                    }
                     break;
 
                 case 'card_played':
@@ -532,6 +708,18 @@
 
                 case 'player_left':
                     addLog(msg.player_name + ' left the room', 'error');
+                    break;
+
+                case 'action_result':
+                    if (msg.success !== undefined) {
+                        addLog((msg.player_name ? msg.player_name + ': ' : '') + msg.message, msg.success ? 'success' : 'error');
+                    } else if (msg.result) {
+                        if (msg.result.success) {
+                            addLog(msg.action.replace('_', ' ') + ' completed', 'success');
+                        } else {
+                            addLog(msg.result.message || 'Action failed', 'error');
+                        }
+                    }
                     break;
 
                 case 'error':
@@ -600,6 +788,150 @@
                     (canJoin ? '<button onclick="joinRoom(\'' + r.room_id + '\')">Join</button>' : '') +
                     '</div>';
             }).join('');
+        }
+
+        // Azrok's Republic action functions
+        function investPeople() {
+            const amount = parseInt(document.getElementById('investAmount').value);
+            if (!amount || amount <= 0) { addLog('Enter a valid amount', 'error'); return; }
+            send({ action: 'invest_people', amount: amount });
+        }
+
+        function investImprovement() {
+            send({ action: 'invest_improvement' });
+        }
+
+        function useTax() {
+            const targetId = parseInt(document.getElementById('taxTarget').value);
+            if (isNaN(targetId)) { addLog('Select a target', 'error'); return; }
+            send({ action: 'use_tax', target_id: targetId });
+        }
+
+        function buyPowderCharge() {
+            send({ action: 'buy_powder_charge' });
+        }
+
+        function buyAzroksDagger() {
+            send({ action: 'buy_azroks_dagger' });
+        }
+
+        function endTurn() {
+            send({ action: 'end_turn' });
+        }
+
+        function resolveRound() {
+            send({ action: 'resolve_round' });
+        }
+
+        function startNextRound() {
+            send({ action: 'start_round' });
+        }
+
+        function updateAzrokUI(state) {
+            if (!state) return;
+
+            // Info bar
+            document.getElementById('azrokRound').textContent = (state.current_round || 0) + '/' + (state.max_rounds || 10);
+            document.getElementById('azrokWarFails').textContent = '⚔️ ' + (state.war_failures || 0) + '/' + (state.max_war_failures || 3);
+            document.getElementById('azrokPot').textContent = '$' + (state.people_pot || 0);
+            document.getElementById('azrokMoney').textContent = '$' + (state.your_money !== undefined ? state.your_money : 0);
+            document.getElementById('azrokWarCost').textContent = '$' + (state.war_cost || 0);
+
+            // Role info
+            var roleInfo = document.getElementById('azrokRoleInfo');
+            if (state.your_role) {
+                var isAgent = state.your_role === 'Agent of the Drow';
+                roleInfo.innerHTML = '<div class="role-label">Your Role</div>' +
+                    '<div class="role-value" style="color:' + (isAgent ? '#c0392b' : '#2ecc71') + '">' + state.your_role + '</div>' +
+                    '<div class="sector-value">Sector: ' + (state.your_sector || '') + '</div>';
+            }
+
+            // Turn info
+            var turnInfo = document.getElementById('azrokTurnInfo');
+            var currentPlayer = state.current_player;
+            var isMyTurn = currentPlayer === state.your_id;
+
+            if (state.state === 'investment_phase') {
+                var currentName = state.player_names && state.player_names[currentPlayer] ? state.player_names[currentPlayer] : 'Player ' + currentPlayer;
+                if (isMyTurn) {
+                    turnInfo.innerHTML = '🟢 It\'s YOUR turn!';
+                    turnInfo.className = 'turn-info your-turn';
+                } else {
+                    turnInfo.innerHTML = 'Waiting for ' + currentName + '...';
+                    turnInfo.className = 'turn-info';
+                }
+            } else if (state.state === 'resolution_phase') {
+                turnInfo.innerHTML = '📋 Resolution Phase — Click to resolve the round';
+                turnInfo.className = 'turn-info';
+            } else if (state.state === 'round_end') {
+                turnInfo.innerHTML = '✅ Round complete! Start the next round.';
+                turnInfo.className = 'turn-info';
+            } else {
+                turnInfo.innerHTML = '';
+                turnInfo.className = 'turn-info';
+            }
+
+            // Player table
+            var table = document.getElementById('azrokPlayerTable');
+            var html = '<table class="player-table"><tr><th>Player</th><th>Sector</th><th>Money</th><th>Tools</th></tr>';
+            var sectors = state.sectors || {};
+            var money = state.player_money || {};
+            var levels = state.improvement_levels || {};
+            var names = state.player_names || {};
+
+            for (var i = 0; i < (state.num_players || 4); i++) {
+                var isCurrent = (currentPlayer === i && state.state === 'investment_phase');
+                var isMe = (i === state.your_id);
+                var classes = [];
+                if (isCurrent) classes.push('active-player');
+                if (isMe) classes.push('is-you');
+                var genSec = state.general_secretary === i ? ' 👑' : '';
+                html += '<tr class="' + classes.join(' ') + '">' +
+                    '<td>' + (names[i] || 'Player ' + i) + genSec + (isMe ? ' (you)' : '') + '</td>' +
+                    '<td>' + (sectors[i] || '') + '</td>' +
+                    '<td>$' + (money[i] !== undefined ? money[i] : '?') + '</td>' +
+                    '<td>' + (levels[i] || 1) + 'X</td>' +
+                    '</tr>';
+            }
+            html += '</table>';
+            table.innerHTML = html;
+
+            // Actions panel (only during investment phase and your turn)
+            var actionsPanel = document.getElementById('azrokActions');
+            if (state.state === 'investment_phase' && isMyTurn) {
+                actionsPanel.style.display = 'block';
+                var taxSelect = document.getElementById('taxTarget');
+                if (taxSelect) {
+                    var options = '<option value="">Select player...</option>';
+                    for (var j = 0; j < (state.num_players || 4); j++) {
+                        if (j !== state.your_id) {
+                            options += '<option value="' + j + '">' + (names[j] || 'Player ' + j) + '</option>';
+                        }
+                    }
+                    taxSelect.innerHTML = options;
+                }
+            } else {
+                actionsPanel.style.display = 'none';
+            }
+
+            // Resolution panel
+            var resPanel = document.getElementById('azrokResolution');
+            resPanel.style.display = (state.state === 'resolution_phase') ? 'block' : 'none';
+
+            // Next round panel
+            var nextPanel = document.getElementById('azrokNextRound');
+            nextPanel.style.display = (state.state === 'round_end') ? 'block' : 'none';
+
+            // Game over
+            if (state.state === 'game_won_republic') {
+                document.getElementById('gameOverTitle').textContent = '🏰 The Republic Wins!';
+                document.getElementById('gameOverMsg').textContent = 'The Brothers of the Republic have prevailed!';
+                document.getElementById('gameOverOverlay').classList.add('active');
+            } else if (state.state === 'game_won_drow') {
+                document.getElementById('gameOverTitle').textContent = '🗡️ The Drow Win!';
+                document.getElementById('gameOverMsg').textContent = 'The Agents of the Drow have sabotaged the Republic!';
+                document.getElementById('gameOverOverlay').classList.add('active');
+            }
         }
 
         // No auto-connect on load — user picks a game first from the hub
