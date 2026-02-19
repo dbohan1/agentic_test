@@ -379,6 +379,83 @@
             color: #e0e0e0;
             font-size: 0.95em;
         }
+
+        /* Team Supreme Scribbles */
+        #scribblesGame { text-align: center; }
+
+        .scribbles-word-card {
+            margin: 20px auto;
+            padding: 30px 40px;
+            background: rgba(233, 69, 96, 0.15);
+            border: 3px solid rgba(233, 69, 96, 0.4);
+            border-radius: 16px;
+            max-width: 450px;
+        }
+        .scribbles-word-card .word-label { font-size: 0.85em; color: #999; margin-bottom: 8px; }
+        .scribbles-word-card .word-value { font-size: 2.2em; font-weight: bold; color: #e94560; }
+
+        .scribbles-waiting-card {
+            margin: 20px auto;
+            padding: 30px 40px;
+            background: rgba(15, 52, 96, 0.3);
+            border: 3px solid rgba(15, 52, 96, 0.5);
+            border-radius: 16px;
+            max-width: 450px;
+        }
+        .scribbles-waiting-card .waiting-icon { font-size: 3em; margin-bottom: 10px; }
+        .scribbles-waiting-card .waiting-text { font-size: 1.2em; color: #999; }
+        .scribbles-waiting-card .drawer-name { font-size: 1.1em; color: #f5a623; font-weight: bold; }
+
+        .scribbles-guess-area {
+            margin: 16px auto;
+            max-width: 450px;
+            display: flex;
+            gap: 8px;
+        }
+        .scribbles-guess-area input {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #1a1a2e;
+            color: #e0e0e0;
+        }
+        .scribbles-guess-area button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            background: #2ecc71;
+            color: #fff;
+        }
+        .scribbles-guess-area button:hover { background: #27ae60; }
+
+        .scribbles-score-table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            max-width: 400px;
+            width: 100%;
+        }
+        .scribbles-score-table th, .scribbles-score-table td {
+            padding: 8px 14px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .scribbles-score-table th { color: #999; font-size: 0.85em; text-transform: uppercase; }
+        .scribbles-score-table tr.is-drawer { background: rgba(233, 69, 96, 0.15); }
+        .scribbles-score-table tr.is-you { font-weight: bold; }
+
+        .scribbles-round-end {
+            margin: 20px auto;
+            padding: 24px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            max-width: 400px;
+        }
+        .scribbles-round-end .revealed-word { font-size: 1.5em; font-weight: bold; color: #f5a623; margin: 8px 0; }
     </style>
 </head>
 <body>
@@ -398,6 +475,12 @@
                 <div class="game-icon">🏰</div>
                 <div class="game-title">Azrok's Republic</div>
                 <div class="game-desc">A politburo investment &amp; deception game for 4 players. Hidden roles, war funding, and intrigue!</div>
+                <span class="game-badge badge-ready">Ready to Play</span>
+            </div>
+            <div class="game-card" role="button" tabindex="0" onclick="selectGame('team_supreme_scribbles')" onkeydown="if(event.key==='Enter')selectGame('team_supreme_scribbles')">
+                <div class="game-icon">🎨</div>
+                <div class="game-title">Team Supreme Scribbles</div>
+                <div class="game-desc">A Pictionary-style drawing &amp; guessing game. No player cap — grab the whole crew!</div>
                 <span class="game-badge badge-ready">Ready to Play</span>
             </div>
             <div class="game-card disabled" role="button" aria-disabled="true" tabindex="-1">
@@ -521,6 +604,59 @@
         </div>
     </div>
 
+    <!-- Team Supreme Scribbles Game Screen -->
+    <div id="scribblesGame" class="screen">
+        <div class="info-bar">
+            <div class="info-item"><div class="label">Round</div><span id="scribblesRound">0/3</span></div>
+            <div class="info-item"><div class="label">Drawer</div><span id="scribblesDrawer">—</span></div>
+            <div class="info-item"><div class="label">Your Score</div><span id="scribblesMyScore">0</span></div>
+        </div>
+
+        <!-- Drawer view: shows the word -->
+        <div id="scribblesDrawerView" style="display:none;">
+            <div class="scribbles-word-card">
+                <div class="word-label">✏️ You are the drawer! Draw this word:</div>
+                <div class="word-value" id="scribblesWord">—</div>
+            </div>
+            <div style="margin:16px;">
+                <button class="action-btn end-turn" onclick="scribblesEndDrawing()">⏭️ Skip / End Drawing</button>
+            </div>
+        </div>
+
+        <!-- Guesser view: input to guess -->
+        <div id="scribblesGuesserView" style="display:none;">
+            <div class="scribbles-waiting-card">
+                <div class="waiting-icon">🎨</div>
+                <div class="drawer-name" id="scribblesDrawerName">— is drawing...</div>
+                <div class="waiting-text">Try to guess what they're drawing!</div>
+            </div>
+            <div class="scribbles-guess-area">
+                <input type="text" id="scribblesGuessInput" placeholder="Type your guess..." maxlength="50" onkeydown="if(event.key==='Enter')scribblesGuess()">
+                <button onclick="scribblesGuess()">Guess</button>
+            </div>
+        </div>
+
+        <!-- Round end view -->
+        <div id="scribblesRoundEnd" style="display:none;">
+            <div class="scribbles-round-end">
+                <div>The word was:</div>
+                <div class="revealed-word" id="scribblesRevealedWord">—</div>
+                <button class="action-btn next-round" onclick="scribblesStartRound()">▶️ Next Round</button>
+            </div>
+        </div>
+
+        <!-- Game over view -->
+        <div id="scribblesGameOver" style="display:none;">
+            <div class="scribbles-round-end">
+                <h2 style="color:#e94560;">🎉 Game Over!</h2>
+                <p style="color:#999;margin:8px 0;">Final Scores below</p>
+            </div>
+        </div>
+
+        <!-- Score table (always visible) -->
+        <div id="scribblesScoreTable"></div>
+    </div>
+
     <!-- Game Over Overlay -->
     <div id="gameOverOverlay" class="overlay">
         <div class="overlay-content">
@@ -539,6 +675,8 @@
         let myRoomId = null;
         let selectedGameType = null;
         const AZROK_GAME_STATES = ['investment_phase', 'resolution_phase', 'round_end', 'game_won_republic', 'game_won_drow', 'setup'];
+        const SCRIBBLES_GAME_STATES = ['waiting', 'drawing', 'round_end', 'game_over'];
+        let lastScribblesWord = null;
 
         function getWsUrl() {
             const loc = window.location;
@@ -589,14 +727,39 @@
                 return;
             }
             selectedGameType = gameType;
-            const titles = { 'the_mind': '🧠 The Mind — Lobby', 'azroks_republic': '🏰 Azrok\'s Republic — Lobby' };
+            const titles = {
+                'the_mind': '🧠 The Mind — Lobby',
+                'azroks_republic': '🏰 Azrok\'s Republic — Lobby',
+                'team_supreme_scribbles': '🎨 Team Supreme Scribbles — Lobby'
+            };
             document.getElementById('lobbyTitle').textContent = titles[gameType] || 'Lobby';
 
             const numPlayersSelect = document.getElementById('numPlayers');
+            numPlayersSelect.innerHTML = '';
             if (gameType === 'azroks_republic') {
-                numPlayersSelect.value = '4';
+                for (var n = 4; n <= 4; n++) {
+                    var opt = document.createElement('option');
+                    opt.value = n;
+                    opt.textContent = n + ' Players';
+                    numPlayersSelect.appendChild(opt);
+                }
                 numPlayersSelect.disabled = true;
+            } else if (gameType === 'team_supreme_scribbles') {
+                for (var n = 1; n <= 20; n++) {
+                    var opt = document.createElement('option');
+                    opt.value = n;
+                    opt.textContent = n + (n === 1 ? ' Player' : ' Players');
+                    numPlayersSelect.appendChild(opt);
+                }
+                numPlayersSelect.value = '4';
+                numPlayersSelect.disabled = false;
             } else {
+                for (var n = 2; n <= 4; n++) {
+                    var opt = document.createElement('option');
+                    opt.value = n;
+                    opt.textContent = n + ' Players';
+                    numPlayersSelect.appendChild(opt);
+                }
                 numPlayersSelect.disabled = false;
             }
 
@@ -668,6 +831,8 @@
                 case 'game_started':
                     if (selectedGameType === 'azroks_republic') {
                         showScreen('azrokGame');
+                    } else if (selectedGameType === 'team_supreme_scribbles') {
+                        showScreen('scribblesGame');
                     } else {
                         showScreen('game');
                     }
@@ -675,7 +840,9 @@
                     break;
 
                 case 'game_state':
-                    if (msg.state && AZROK_GAME_STATES.includes(msg.state)) {
+                    if (selectedGameType === 'team_supreme_scribbles' && msg.state && SCRIBBLES_GAME_STATES.includes(msg.state)) {
+                        updateScribblesUI(msg);
+                    } else if (msg.state && AZROK_GAME_STATES.includes(msg.state)) {
                         updateAzrokUI(msg);
                     } else {
                         updateGameUI(msg);
@@ -711,7 +878,31 @@
                     break;
 
                 case 'action_result':
-                    if (msg.success !== undefined) {
+                    if (msg.action === 'scribbles_guess') {
+                        if (msg.correct) {
+                            addLog((msg.player_name || 'Someone') + ' guessed correctly! ' + msg.message, 'success');
+                            // Extract revealed word from message like "Correct! The word was 'xyz'"
+                            var wordMatch = msg.message && msg.message.match(/word was '(.+)'/);
+                            if (wordMatch) lastScribblesWord = wordMatch[1];
+                        } else {
+                            addLog((msg.player_name || 'Someone') + ': ' + msg.message, 'info');
+                        }
+                    } else if (msg.action === 'scribbles_end_drawing') {
+                        addLog(msg.message, 'info');
+                        // Extract revealed word from message like "Round ended. The word was 'xyz'"
+                        var wordMatch2 = msg.message && msg.message.match(/word was '(.+)'/);
+                        if (wordMatch2) lastScribblesWord = wordMatch2[1];
+                    } else if (msg.action === 'scribbles_start_round') {
+                        if (msg.result && msg.result.success) {
+                            if (msg.result.game_over) {
+                                addLog('Game over!', 'info');
+                            } else {
+                                addLog('New round started!', 'success');
+                            }
+                        } else if (msg.result) {
+                            addLog(msg.result.message || 'Action failed', 'error');
+                        }
+                    } else if (msg.success !== undefined) {
                         addLog((msg.player_name ? msg.player_name + ': ' : '') + msg.message, msg.success ? 'success' : 'error');
                     } else if (msg.result) {
                         if (msg.result.success) {
@@ -955,6 +1146,82 @@
                 document.getElementById('gameOverMsg').textContent = 'The Agents of the Drow have sabotaged the Republic!';
                 document.getElementById('gameOverOverlay').classList.add('active');
             }
+        }
+
+        // Team Supreme Scribbles action functions
+        function scribblesGuess() {
+            var input = document.getElementById('scribblesGuessInput');
+            var word = input.value.trim();
+            if (!word) { addLog('Enter a guess', 'error'); return; }
+            send({ action: 'scribbles_guess', word: word });
+            input.value = '';
+        }
+
+        function scribblesEndDrawing() {
+            send({ action: 'scribbles_end_drawing' });
+        }
+
+        function scribblesStartRound() {
+            send({ action: 'scribbles_start_round' });
+        }
+
+        function updateScribblesUI(state) {
+            if (!state) return;
+
+            // Info bar
+            document.getElementById('scribblesRound').textContent = (state.current_round || 0) + '/' + (state.num_rounds || 3);
+            var drawerName = state.player_names && state.player_names[state.current_drawer] ? state.player_names[state.current_drawer] : 'Player ' + state.current_drawer;
+            document.getElementById('scribblesDrawer').textContent = drawerName;
+            var myScore = state.scores && state.your_id !== undefined ? (state.scores[state.your_id] || 0) : 0;
+            document.getElementById('scribblesMyScore').textContent = myScore;
+
+            var isDrawer = state.your_id === state.current_drawer;
+
+            // Track word for round-end reveal
+            if (state.your_word) {
+                lastScribblesWord = state.your_word;
+            }
+
+            // Hide all sub-views
+            document.getElementById('scribblesDrawerView').style.display = 'none';
+            document.getElementById('scribblesGuesserView').style.display = 'none';
+            document.getElementById('scribblesRoundEnd').style.display = 'none';
+            document.getElementById('scribblesGameOver').style.display = 'none';
+
+            if (state.state === 'drawing') {
+                if (isDrawer) {
+                    document.getElementById('scribblesDrawerView').style.display = 'block';
+                    document.getElementById('scribblesWord').textContent = state.your_word || '—';
+                } else {
+                    document.getElementById('scribblesGuesserView').style.display = 'block';
+                    document.getElementById('scribblesDrawerName').textContent = escapeHtml(drawerName) + ' is drawing...';
+                }
+            } else if (state.state === 'round_end') {
+                document.getElementById('scribblesRoundEnd').style.display = 'block';
+                document.getElementById('scribblesRevealedWord').textContent = lastScribblesWord || '?';
+            } else if (state.state === 'game_over') {
+                document.getElementById('scribblesGameOver').style.display = 'block';
+            }
+
+            // Score table (always visible)
+            var table = document.getElementById('scribblesScoreTable');
+            var html = '<table class="scribbles-score-table"><tr><th>Player</th><th>Score</th></tr>';
+            var names = state.player_names || {};
+            var scores = state.scores || {};
+
+            for (var i = 0; i < (state.num_players || 1); i++) {
+                var isMe = (i === state.your_id);
+                var isDrawerRow = (i === state.current_drawer && state.state === 'drawing');
+                var classes = [];
+                if (isDrawerRow) classes.push('is-drawer');
+                if (isMe) classes.push('is-you');
+                html += '<tr class="' + classes.join(' ') + '">' +
+                    '<td>' + escapeHtml(names[i] || 'Player ' + i) + (isMe ? ' (you)' : '') + (isDrawerRow ? ' 🎨' : '') + '</td>' +
+                    '<td>' + (scores[i] !== undefined ? scores[i] : 0) + '</td>' +
+                    '</tr>';
+            }
+            html += '</table>';
+            table.innerHTML = html;
         }
 
         // No auto-connect on load — user picks a game first from the hub
