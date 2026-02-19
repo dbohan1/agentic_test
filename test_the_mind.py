@@ -148,6 +148,112 @@ class TestTheMindGame(unittest.TestCase):
         self.assertEqual(info["throwing_stars"], 1)
         self.assertIn("state", info)
         self.assertIn("played_pile", info)
+    
+    def test_skipped_cards_loses_life(self):
+        """Test that playing a card higher than another player's card loses a life."""
+        game = TheMind(num_players=2)
+        game.setup_level()
+        
+        # Player 0 has 50, Player 1 has 20
+        game.player_hands = {0: [50], 1: [20]}
+        game.played_pile = []
+        initial_lives = game.lives
+        
+        # Player 0 plays 50, skipping Player 1's 20
+        success, msg = game.play_card(0, 50)
+        self.assertTrue(success)
+        self.assertEqual(game.lives, initial_lives - 1)
+        self.assertIn("skipped", msg)
+        # Player 1's card 20 should be discarded
+        self.assertEqual(game.player_hands[1], [])
+        self.assertIn(20, game.discarded_cards)
+    
+    def test_skipped_cards_multiple_players(self):
+        """Test skipped cards across multiple players."""
+        game = TheMind(num_players=3)
+        game.setup_level()
+        
+        # Player 0 has 60, Player 1 has 20, Player 2 has 40
+        game.player_hands = {0: [60], 1: [20], 2: [40]}
+        game.played_pile = []
+        initial_lives = game.lives
+        
+        # Player 0 plays 60, skipping cards 20 and 40
+        success, msg = game.play_card(0, 60)
+        self.assertTrue(success)
+        self.assertEqual(game.lives, initial_lives - 1)
+        self.assertEqual(game.player_hands[1], [])
+        self.assertEqual(game.player_hands[2], [])
+        self.assertIn(20, game.discarded_cards)
+        self.assertIn(40, game.discarded_cards)
+    
+    def test_no_skipped_cards_no_life_loss(self):
+        """Test that playing the lowest available card does not lose a life."""
+        game = TheMind(num_players=2)
+        game.setup_level()
+        
+        # Player 0 has 10, Player 1 has 50
+        game.player_hands = {0: [10], 1: [50]}
+        game.played_pile = []
+        initial_lives = game.lives
+        
+        # Player 0 plays 10 (no cards lower than 10 exist)
+        success, msg = game.play_card(0, 10)
+        self.assertTrue(success)
+        self.assertEqual(game.lives, initial_lives)
+        self.assertNotIn("skipped", msg)
+    
+    def test_skipped_cards_own_hand(self):
+        """Test that a player's own lower cards are also discarded."""
+        game = TheMind(num_players=2)
+        game.setup_level()
+        
+        # Player 0 has 10 and 50, Player 1 has 60
+        game.player_hands = {0: [10, 50], 1: [60]}
+        game.played_pile = []
+        initial_lives = game.lives
+        
+        # Player 0 plays 50, their own 10 should be skipped
+        success, msg = game.play_card(0, 50)
+        self.assertTrue(success)
+        self.assertEqual(game.lives, initial_lives - 1)
+        self.assertEqual(game.player_hands[0], [])
+        self.assertIn(10, game.discarded_cards)
+    
+    def test_skipped_cards_game_over(self):
+        """Test that skipped cards can cause game over."""
+        game = TheMind(num_players=2)
+        game.setup_level()
+        game.lives = 1
+        
+        # Player 0 has 50, Player 1 has 20
+        game.player_hands = {0: [50], 1: [20]}
+        game.played_pile = []
+        
+        # Player 0 plays 50, skipping Player 1's 20
+        success, msg = game.play_card(0, 50)
+        self.assertTrue(success)
+        self.assertEqual(game.lives, 0)
+        self.assertEqual(game.state, GameState.GAME_LOST)
+    
+    def test_skipped_cards_with_pile_context(self):
+        """Test that only cards between last played and played card are skipped."""
+        game = TheMind(num_players=2)
+        game.setup_level()
+        
+        # Pile already has card 30
+        game.player_hands = {0: [50], 1: [25, 40]}
+        game.played_pile = [30]
+        initial_lives = game.lives
+        
+        # Player 0 plays 50. Player 1's 40 is between 30 and 50 (skipped).
+        # Player 1's 25 is NOT between 30 and 50 (not skipped).
+        success, msg = game.play_card(0, 50)
+        self.assertTrue(success)
+        self.assertEqual(game.lives, initial_lives - 1)
+        self.assertIn(40, game.discarded_cards)
+        self.assertNotIn(25, game.discarded_cards)
+        self.assertEqual(game.player_hands[1], [25])
 
 
 if __name__ == "__main__":

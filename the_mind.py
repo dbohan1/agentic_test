@@ -132,10 +132,22 @@ class TheMind:
         self.player_hands[player_id].remove(card)
         self.played_pile.append(card)
         
+        # Check if any cards were skipped (other players had lower cards)
+        cards_skipped = self._handle_skipped_cards(last_played_card, card)
+        
+        # Check if game is lost due to skipped cards
+        if self.state == GameState.GAME_LOST:
+            return True, f"Card {card} played but cards were skipped! Lost a life. Game over!"
+        
         # Check if level is complete
         if self._is_level_complete():
             self._complete_level()
+            if cards_skipped:
+                return True, f"Card {card} played successfully! Level {self.current_level - 1} complete! But cards were skipped - lost a life."
             return True, f"Card {card} played successfully! Level {self.current_level - 1} complete!"
+        
+        if cards_skipped:
+            return True, f"Card {card} played but cards were skipped! Lost a life."
         
         return True, f"Card {card} played successfully!"
     
@@ -162,6 +174,37 @@ class TheMind:
         
         if self.lives <= 0:
             self.state = GameState.GAME_LOST
+    
+    def _handle_skipped_cards(self, last_played_card: int, played_card: int) -> bool:
+        """
+        Check if any players have cards that should have been played
+        before the played card. Discard those cards and lose a life.
+        
+        Args:
+            last_played_card: The card that was on top of the pile before the play
+            played_card: The card that was just played
+            
+        Returns:
+            True if cards were skipped (life lost), False otherwise
+        """
+        skipped_cards: List[int] = []
+        
+        for player_id in self.player_hands:
+            cards_to_discard = [
+                card for card in self.player_hands[player_id]
+                if last_played_card < card < played_card
+            ]
+            for card in cards_to_discard:
+                self.player_hands[player_id].remove(card)
+                self.discarded_cards.append(card)
+                skipped_cards.append(card)
+        
+        if skipped_cards:
+            self.lives -= 1
+            if self.lives <= 0:
+                self.state = GameState.GAME_LOST
+            return True
+        return False
     
     def use_throwing_star(self) -> Tuple[bool, Dict[int, int]]:
         """
