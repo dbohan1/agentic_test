@@ -133,7 +133,7 @@ class TheMind:
         self.played_pile.append(card)
         
         # Check if any cards were skipped (other players had lower cards)
-        cards_skipped = self._handle_skipped_cards(last_played_card, card)
+        were_cards_skipped = self._handle_skipped_cards(last_played_card, card)
         
         # Check if game is lost due to skipped cards
         if self.state == GameState.GAME_LOST:
@@ -142,11 +142,11 @@ class TheMind:
         # Check if level is complete
         if self._is_level_complete():
             self._complete_level()
-            if cards_skipped:
+            if were_cards_skipped:
                 return True, f"Card {card} played successfully! Level {self.current_level - 1} complete! But cards were skipped - lost a life."
             return True, f"Card {card} played successfully! Level {self.current_level - 1} complete!"
         
-        if cards_skipped:
+        if were_cards_skipped:
             return True, f"Card {card} played but cards were skipped! Lost a life."
         
         return True, f"Card {card} played successfully!"
@@ -194,10 +194,11 @@ class TheMind:
                 card for card in self.player_hands[player_id]
                 if last_played_card < card < played_card
             ]
-            for card in cards_to_discard:
-                self.player_hands[player_id].remove(card)
-                self.discarded_cards.append(card)
-                skipped_cards.append(card)
+            self.player_hands[player_id] = [
+                c for c in self.player_hands[player_id] if c not in cards_to_discard
+            ]
+            self.discarded_cards.extend(cards_to_discard)
+            skipped_cards.extend(cards_to_discard)
         
         if skipped_cards:
             self.lives -= 1
