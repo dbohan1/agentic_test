@@ -177,7 +177,7 @@ class GameServer:
 
     async def _get_room_and_player(
         self, ws: ServerConnection
-    ) -> tuple:
+    ) -> tuple[Optional[GameRoom], Optional[int], Optional[str]]:
         """Helper to get room and player_id for a ws connection.
 
         Returns (room, player_id, room_id) or (None, None, None) on error.

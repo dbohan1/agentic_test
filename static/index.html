@@ -538,7 +538,7 @@
         let myPlayerId = null;
         let myRoomId = null;
         let selectedGameType = null;
-        const AZROK_STATES = ['investment_phase', 'resolution_phase', 'round_end', 'game_won_republic', 'game_won_drow', 'setup'];
+        const AZROK_GAME_STATES = ['investment_phase', 'resolution_phase', 'round_end', 'game_won_republic', 'game_won_drow', 'setup'];
 
         function getWsUrl() {
             const loc = window.location;
@@ -675,7 +675,7 @@
                     break;
 
                 case 'game_state':
-                    if (msg.state && AZROK_STATES.includes(msg.state)) {
+                    if (msg.state && AZROK_GAME_STATES.includes(msg.state)) {
                         updateAzrokUI(msg);
                     } else {
                         updateGameUI(msg);
@@ -827,6 +827,12 @@
             send({ action: 'start_round' });
         }
 
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         function updateAzrokUI(state) {
             if (!state) return;
 
@@ -837,13 +843,24 @@
             document.getElementById('azrokMoney').textContent = '$' + (state.your_money !== undefined ? state.your_money : 0);
             document.getElementById('azrokWarCost').textContent = '$' + (state.war_cost || 0);
 
-            // Role info
+            // Role info (use textContent via DOM methods to avoid XSS)
             var roleInfo = document.getElementById('azrokRoleInfo');
             if (state.your_role) {
                 var isAgent = state.your_role === 'Agent of the Drow';
-                roleInfo.innerHTML = '<div class="role-label">Your Role</div>' +
-                    '<div class="role-value" style="color:' + (isAgent ? '#c0392b' : '#2ecc71') + '">' + state.your_role + '</div>' +
-                    '<div class="sector-value">Sector: ' + (state.your_sector || '') + '</div>';
+                roleInfo.innerHTML = '';
+                var labelDiv = document.createElement('div');
+                labelDiv.className = 'role-label';
+                labelDiv.textContent = 'Your Role';
+                var valueDiv = document.createElement('div');
+                valueDiv.className = 'role-value';
+                valueDiv.style.color = isAgent ? '#c0392b' : '#2ecc71';
+                valueDiv.textContent = state.your_role;
+                var sectorDiv = document.createElement('div');
+                sectorDiv.className = 'sector-value';
+                sectorDiv.textContent = 'Sector: ' + (state.your_sector || '');
+                roleInfo.appendChild(labelDiv);
+                roleInfo.appendChild(valueDiv);
+                roleInfo.appendChild(sectorDiv);
             }
 
             // Turn info
@@ -854,24 +871,24 @@
             if (state.state === 'investment_phase') {
                 var currentName = state.player_names && state.player_names[currentPlayer] ? state.player_names[currentPlayer] : 'Player ' + currentPlayer;
                 if (isMyTurn) {
-                    turnInfo.innerHTML = '🟢 It\'s YOUR turn!';
+                    turnInfo.textContent = '🟢 It\'s YOUR turn!';
                     turnInfo.className = 'turn-info your-turn';
                 } else {
-                    turnInfo.innerHTML = 'Waiting for ' + currentName + '...';
+                    turnInfo.textContent = 'Waiting for ' + currentName + '...';
                     turnInfo.className = 'turn-info';
                 }
             } else if (state.state === 'resolution_phase') {
-                turnInfo.innerHTML = '📋 Resolution Phase — Click to resolve the round';
+                turnInfo.textContent = '📋 Resolution Phase — Click to resolve the round';
                 turnInfo.className = 'turn-info';
             } else if (state.state === 'round_end') {
-                turnInfo.innerHTML = '✅ Round complete! Start the next round.';
+                turnInfo.textContent = '✅ Round complete! Start the next round.';
                 turnInfo.className = 'turn-info';
             } else {
-                turnInfo.innerHTML = '';
+                turnInfo.textContent = '';
                 turnInfo.className = 'turn-info';
             }
 
-            // Player table
+            // Player table (escape user-provided names)
             var table = document.getElementById('azrokPlayerTable');
             var html = '<table class="player-table"><tr><th>Player</th><th>Sector</th><th>Money</th><th>Tools</th></tr>';
             var sectors = state.sectors || {};
@@ -887,8 +904,8 @@
                 if (isMe) classes.push('is-you');
                 var genSec = state.general_secretary === i ? ' 👑' : '';
                 html += '<tr class="' + classes.join(' ') + '">' +
-                    '<td>' + (names[i] || 'Player ' + i) + genSec + (isMe ? ' (you)' : '') + '</td>' +
-                    '<td>' + (sectors[i] || '') + '</td>' +
+                    '<td>' + escapeHtml(names[i] || 'Player ' + i) + genSec + (isMe ? ' (you)' : '') + '</td>' +
+                    '<td>' + escapeHtml(sectors[i] || '') + '</td>' +
                     '<td>$' + (money[i] !== undefined ? money[i] : '?') + '</td>' +
                     '<td>' + (levels[i] || 1) + 'X</td>' +
                     '</tr>';
@@ -902,13 +919,19 @@
                 actionsPanel.style.display = 'block';
                 var taxSelect = document.getElementById('taxTarget');
                 if (taxSelect) {
-                    var options = '<option value="">Select player...</option>';
+                    taxSelect.innerHTML = '';
+                    var defaultOpt = document.createElement('option');
+                    defaultOpt.value = '';
+                    defaultOpt.textContent = 'Select player...';
+                    taxSelect.appendChild(defaultOpt);
                     for (var j = 0; j < (state.num_players || 4); j++) {
                         if (j !== state.your_id) {
-                            options += '<option value="' + j + '">' + (names[j] || 'Player ' + j) + '</option>';
+                            var opt = document.createElement('option');
+                            opt.value = j;
+                            opt.textContent = names[j] || 'Player ' + j;
+                            taxSelect.appendChild(opt);
                         }
                     }
-                    taxSelect.innerHTML = options;
                 }
             } else {
                 actionsPanel.style.display = 'none';
