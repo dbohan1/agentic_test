@@ -493,5 +493,136 @@ class TestAzrokServerAsync(unittest.TestCase):
         self.assertIn("Target", response["message"])
 
 
+class TestScribblesServerAsync(unittest.TestCase):
+    """Async test cases for Team Supreme Scribbles WebSocket handling."""
+
+    def setUp(self):
+        self.server = GameServer()
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+    def tearDown(self):
+        self.loop.close()
+
+    def _run(self, coro):
+        return self.loop.run_until_complete(coro)
+
+    def _make_ws(self):
+        ws = AsyncMock()
+        ws.send = AsyncMock()
+        return ws
+
+    def _create_full_scribbles_room(self, num_players=2):
+        """Create a room with the specified number of players and auto-start."""
+        players = [self._make_ws() for _ in range(num_players)]
+        self._run(self.server.handle_message(players[0], json.dumps({
+            "action": "create_room", "room_id": "scrib1", "num_players": num_players,
+            "name": "Alice", "game_type": "team_supreme_scribbles"
+        })))
+        for i in range(1, num_players):
+            self._run(self.server.handle_message(players[i], json.dumps({
+                "action": "join_room", "room_id": "scrib1", "name": f"Player{i}"
+            })))
+        return players
+
+    def test_create_scribbles_room(self):
+        """Test creating a Team Supreme Scribbles room via WebSocket."""
+        ws = self._make_ws()
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "create_room", "room_id": "scrib1", "num_players": 3,
+            "name": "Alice", "game_type": "team_supreme_scribbles"
+        })))
+        response = json.loads(ws.send.call_args[0][0])
+        self.assertEqual(response["type"], "room_joined")
+        self.assertEqual(response["game_type"], "team_supreme_scribbles")
+
+    def test_scribbles_game_starts_when_full(self):
+        """Test that game starts when room is full."""
+        players = self._create_full_scribbles_room(2)
+        room = self.server.get_room("scrib1")
+        self.assertIsNotNone(room.game)
+        self.assertEqual(room.game_type, "team_supreme_scribbles")
+
+    def test_scribbles_game_state_includes_word_for_drawer(self):
+        """Test that game state includes the word only for the drawer."""
+        players = self._create_full_scribbles_room(2)
+        room = self.server.get_room("scrib1")
+        drawer_id = room.game.current_drawer
+        # Check that the drawer received the word
+        for call in players[drawer_id].send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "game_state" and "your_word" in msg:
+                self.assertIsNotNone(msg["your_word"])
+                return
+        self.fail("Drawer did not receive word in game_state")
+
+    def test_scribbles_guess_correct(self):
+        """Test submitting a correct guess via WebSocket."""
+        players = self._create_full_scribbles_room(2)
+        room = self.server.get_room("scrib1")
+        word = room.game.current_word
+        guesser_id = 1 if room.game.current_drawer == 0 else 0
+        ws = players[guesser_id]
+        ws.send.reset_mock()
+
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "scribbles_guess", "word": word
+        })))
+        found = False
+        for call in ws.send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "action_result" and msg.get("action") == "scribbles_guess":
+                self.assertTrue(msg["correct"])
+                found = True
+        self.assertTrue(found)
+
+    def test_scribbles_guess_incorrect(self):
+        """Test submitting an incorrect guess via WebSocket."""
+        players = self._create_full_scribbles_room(2)
+        room = self.server.get_room("scrib1")
+        guesser_id = 1 if room.game.current_drawer == 0 else 0
+        ws = players[guesser_id]
+        ws.send.reset_mock()
+
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "scribbles_guess", "word": "definitely_wrong_xyz"
+        })))
+        found = False
+        for call in ws.send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "action_result" and msg.get("action") == "scribbles_guess":
+                self.assertFalse(msg["correct"])
+                found = True
+        self.assertTrue(found)
+
+    def test_scribbles_end_drawing(self):
+        """Test ending a drawing round via WebSocket."""
+        players = self._create_full_scribbles_room(2)
+        ws = players[0]
+        ws.send.reset_mock()
+
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "scribbles_end_drawing"
+        })))
+        found = False
+        for call in ws.send.call_args_list:
+            msg = json.loads(call[0][0])
+            if msg.get("type") == "action_result" and msg.get("action") == "scribbles_end_drawing":
+                self.assertTrue(msg["success"])
+                found = True
+        self.assertTrue(found)
+
+    def test_scribbles_single_player_room(self):
+        """Test that a single-player room can be created."""
+        ws = self._make_ws()
+        self._run(self.server.handle_message(ws, json.dumps({
+            "action": "create_room", "room_id": "solo1", "num_players": 1,
+            "name": "Solo", "game_type": "team_supreme_scribbles"
+        })))
+        response = json.loads(ws.send.call_args[0][0])
+        self.assertEqual(response["type"], "room_joined")
+        self.assertEqual(response["num_players"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

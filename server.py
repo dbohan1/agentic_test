@@ -17,6 +17,7 @@ from websockets.http11 import Request, Response
 
 from the_mind import TheMind, GameState
 from azroks_republic import AzroksRepublic, AzrokGameState
+from team_supreme_scribbles import TeamSupremeScribbles, ScribblesGameState
 
 
 class GameRoom:
@@ -28,7 +29,7 @@ class GameRoom:
         self.game_type = game_type
         self.players: Dict[int, ServerConnection] = {}
         self.player_names: Dict[int, str] = {}
-        self.game: Optional[Union[TheMind, AzroksRepublic]] = None
+        self.game: Optional[Union[TheMind, AzroksRepublic, TeamSupremeScribbles]] = None
 
     @property
     def is_full(self) -> bool:
@@ -65,8 +66,12 @@ class GameServer:
         """Create a new game room."""
         if room_id in self.rooms:
             raise ValueError(f"Room '{room_id}' already exists")
-        if not 2 <= num_players <= 4:
-            raise ValueError("Number of players must be 2-4")
+        if game_type == "team_supreme_scribbles":
+            if num_players < 1:
+                raise ValueError("Number of players must be at least 1")
+        else:
+            if not 2 <= num_players <= 4:
+                raise ValueError("Number of players must be 2-4")
         room = GameRoom(room_id, num_players, game_type)
         self.rooms[room_id] = room
         return room
@@ -102,13 +107,6 @@ class GameServer:
         """Build the shared game state for broadcasting."""
         if not room.game:
             return {"type": "game_state", "state": "waiting"}
-        if room.game_type == "azroks_republic":
-            info = room.game.get_game_info()
-            return {
-                "type": "game_state",
-                **info,
-                "player_names": room.player_names,
-            }
         info = room.game.get_game_info()
         return {
             "type": "game_state",
@@ -130,6 +128,11 @@ class GameServer:
                     player_state["your_improvement_level"] = pinfo.get("improvement_level")
                     player_state["your_salary"] = pinfo.get("salary")
                     player_state["your_id"] = pid
+                elif room.game_type == "team_supreme_scribbles":
+                    player_state["your_id"] = pid
+                    if pid == room.game.current_drawer:
+                        drawer_info = room.game.get_drawer_info()
+                        player_state["your_word"] = drawer_info.get("word")
                 else:
                     player_state["your_hand"] = room.game.get_player_hand(pid)
                     player_state["your_id"] = pid
@@ -172,6 +175,12 @@ class GameServer:
             await self._handle_azrok_action(ws, "resolve_round", msg)
         elif action in ("start_round", "next_round"):
             await self._handle_azrok_action(ws, "start_round", msg)
+        elif action == "scribbles_start_round":
+            await self._handle_scribbles_action(ws, "start_round", msg)
+        elif action == "scribbles_guess":
+            await self._handle_scribbles_action(ws, "guess", msg)
+        elif action == "scribbles_end_drawing":
+            await self._handle_scribbles_action(ws, "end_drawing", msg)
         else:
             await ws.send(json.dumps({"type": "error", "message": f"Unknown action: {action}"}))
 
@@ -254,6 +263,50 @@ class GameServer:
         })
         await self.send_game_state(room)
 
+    async def _handle_scribbles_action(self, ws: ServerConnection, action_name: str, msg: dict) -> None:
+        """Handle a Team Supreme Scribbles game action."""
+        room, player_id, room_id = await self._get_room_and_player(ws)
+        if room is None:
+            return
+
+        if action_name == "start_round":
+            result = room.game.start_round()
+            await self.broadcast(room, {
+                "type": "action_result",
+                "action": "scribbles_start_round",
+                "result": result,
+            })
+            await self.send_game_state(room)
+            return
+        elif action_name == "guess":
+            word = msg.get("word", "")
+            if not word:
+                await ws.send(json.dumps({"type": "error", "message": "Word is required"}))
+                return
+            correct, message = room.game.guess(player_id, word)
+            await self.broadcast(room, {
+                "type": "action_result",
+                "action": "scribbles_guess",
+                "player_id": player_id,
+                "player_name": room.player_names.get(player_id, ""),
+                "correct": correct,
+                "message": message,
+            })
+            await self.send_game_state(room)
+            return
+        elif action_name == "end_drawing":
+            success, message = room.game.end_drawing()
+            await self.broadcast(room, {
+                "type": "action_result",
+                "action": "scribbles_end_drawing",
+                "success": success,
+                "message": message,
+            })
+            await self.send_game_state(room)
+            return
+
+        await ws.send(json.dumps({"type": "error", "message": f"Unknown scribbles action: {action_name}"}))
+
     async def _handle_create_room(self, ws: ServerConnection, msg: dict) -> None:
         room_id = msg.get("room_id", "").strip()
         num_players = msg.get("num_players", 2)
@@ -322,6 +375,10 @@ class GameServer:
             if room.game_type == "azroks_republic":
                 game = AzroksRepublic(room.num_players)
                 game.setup_game()
+                game.start_round()
+                room.game = game
+            elif room.game_type == "team_supreme_scribbles":
+                game = TeamSupremeScribbles(room.num_players)
                 game.start_round()
                 room.game = game
             else:
